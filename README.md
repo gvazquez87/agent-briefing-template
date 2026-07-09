@@ -1,4 +1,4 @@
-# briefing
+# agent-briefing-template
 
 A personal agent context hub: one **private** repo that carries your always-on
 directions, long-form memory, and reusable skills to every machine and every
@@ -126,7 +126,7 @@ Your copy is a normal repo; to pull future improvements to the machinery
 (`bin/`, `adapters/`), add this template as a second remote:
 
 ```bash
-git remote add upstream https://github.com/gvazquez87/briefing-template.git
+git remote add upstream https://github.com/gvazquez87/agent-briefing-template.git
 git fetch upstream
 git merge upstream/main
 ```
