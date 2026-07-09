@@ -109,6 +109,12 @@ Quote any rule you have about <something unique to your directions>, or say NONE
 A verbatim quote proves the directions were injected; "NONE" means that
 agent's wiring is broken. The same prompt works in Vibe and Cursor chat.
 
+## Testing
+
+`test/e2e.sh` exercises the full flow (clone, install, adoption, project
+linking, pruning, status, repair) in a throwaway HOME with fake agents. It
+touches nothing outside a temp directory, so it is safe to run anywhere.
+
 ## Staying current with this template
 
 Your copy is a normal repo; to pull future improvements to the machinery
