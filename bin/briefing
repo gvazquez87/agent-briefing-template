@@ -1,188 +1,71 @@
 #!/usr/bin/env bash
-# briefing - personal agent context hub. One private repo that carries your
-# always-on directions, long-form memory, and reusable skills to every machine
-# and every agent. The repo can live anywhere; every path here is derived.
+# ------------------------------------------------
+# briefing - personal agent context hub
+#
+# One private repo that carries your always-on directions, long-form memory,
+# and reusable skills to every machine and every agent. The repo can live
+# anywhere; every path is derived, nothing is hardcoded.
+#
+# Commands live in lib/cmd-*.sh; per-agent wiring lives in adapters/*.sh.
+# ------------------------------------------------
 set -euo pipefail
 
-# Resolve the hub even when this script is invoked through the ~/.local/bin symlink
+# Resolve the hub even when invoked through the ~/.local/bin symlink
 HUB="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"
 STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/briefing"
 REG="$STATE_DIR/linked-projects"
 DIRECTIONS="$HUB/directions/AGENTS.md"
+export DRY_RUN="${DRY_RUN:-0}"
 
-usage() {
+source "$HUB/lib/log.sh"
+source "$HUB/lib/common.sh"
+
+show_help() {
   cat <<'EOF'
-usage: briefing <command>
+briefing - personal agent context hub
 
+Usage:
+  briefing [-n|--dry-run] <command> [args]
+
+Commands:
   install         wire every installed agent to this repo (idempotent)
   link <dir>      wire a project: skills manifest, HERMES.md mirror, Cursor rule
   sync [msg]      commit memory changes, pull --rebase, reinstall, push
   status          health check: global wiring, projects, repo state
   path            print where this repo lives
+  help            show this message
+
+Options:
+  -n, --dry-run   print mutating actions instead of performing them
+  -h, --help      show help (also per command: briefing <command> --help)
+
+Exit codes:
+  0 = success (status: everything healthy)
+  1 = failure (status: something needs attention)
+  2 = usage error
 EOF
 }
 
-cmd_path() { echo "$HUB"; }
+# Global flags
+while [[ "${1:-}" == -* ]]; do
+  case "$1" in
+    -n|--dry-run) DRY_RUN=1; shift ;;
+    -h|--help)    show_help; exit 0 ;;
+    *) printf 'unknown option: %s\n\n' "$1" >&2; show_help >&2; exit 2 ;;
+  esac
+done
 
-cmd_install() {
-  mkdir -p "$STATE_DIR" "$HOME/.local/bin"
-  echo "$HUB" > "$STATE_DIR/hub"
-  ln -sfn "$HUB/bin/briefing" "$HOME/.local/bin/briefing"
+CMD="${1:-help}"; shift || true
 
-  for a in "$HUB"/adapters/*.sh; do
-    [ "$(basename "$a")" = "_lib.sh" ] || bash "$a"
-  done
-
-  # Re-link every project registered on this machine so generated copies never go stale
-  if [ -f "$REG" ]; then
-    while IFS= read -r p; do
-      [ -d "$p" ] && cmd_link "$p"
-    done < "$REG"
-  fi
-  echo "install: ok ($HUB)"
-}
-
-cmd_link() {
-  local PROJECT MANIFEST TARGET l s
-  PROJECT="$(cd "$1" && pwd)"
-  MANIFEST="$PROJECT/.briefing-skills"
-
-  # 1. Skills: link manifest entries into each agent's project skills dir
-  if [ -f "$MANIFEST" ]; then
-    for TARGET in "$PROJECT/.vibe/skills" "$PROJECT/.cursor/skills"; do
-      mkdir -p "$TARGET"
-      for l in "$TARGET"/*; do            # drop links no longer in the manifest
-        [ -L "$l" ] || continue
-        case "$(readlink "$l")" in "$HUB/skills/"*)
-          grep -qxF "$(basename "$l")" "$MANIFEST" || rm "$l" ;;
-        esac
-      done
-      while IFS= read -r s; do
-        [ -z "$s" ] || [ "${s:0:1}" = "#" ] && continue
-        [ -d "$HUB/skills/$s" ] || { echo "unknown skill: $s"; exit 1; }
-        ln -sfn "$HUB/skills/$s" "$TARGET/$s"
-      done < "$MANIFEST"
-    done
-  fi
-
-  # 2. Hermes project rules: mirror the project's AGENTS.md
-  [ -f "$PROJECT/AGENTS.md" ] && ln -sfn "$PROJECT/AGENTS.md" "$PROJECT/HERMES.md"
-
-  # 3. Cursor: global directions as an always-on rule (generated, single source)
-  mkdir -p "$PROJECT/.cursor/rules"
-  { printf -- '---\ndescription: briefing directions (generated, edit %s)\nalwaysApply: true\n---\n' "$DIRECTIONS"
-    cat "$DIRECTIONS"
-  } > "$PROJECT/.cursor/rules/briefing.mdc"
-
-  # 4. Register (machine-local) so `briefing install` re-links this project
-  mkdir -p "$(dirname "$REG")"
-  grep -qxF "$PROJECT" "$REG" 2>/dev/null || echo "$PROJECT" >> "$REG"
-
-  echo "linked: $PROJECT"
-}
-
-cmd_sync() {
-  cd "$HUB"
-  if [ -n "$(git status --porcelain memory/)" ]; then
-    git add memory/ && git commit -m "memory: ${1:-update $(date +%F)}"
-  fi
-  git pull --rebase --autostash
-  cmd_install
-  git push
-}
-
-cmd_status() {
-  cd "$HUB"
-  local FAIL=0
-
-  ok()   { printf '  \033[32m ok  \033[0m %s\n' "$1"; }
-  bad()  { printf '  \033[31m BAD \033[0m %s\n' "$1"; FAIL=1; }
-  stale(){ printf '  \033[33mstale\033[0m %s\n' "$1"; FAIL=1; }
-  skip() { printf '  \033[2m  -  \033[0m %s\n' "$1"; }
-
-  echo "global"
-  [ "$(readlink "$HOME/.local/bin/briefing" 2>/dev/null)" = "$HUB/bin/briefing" ] \
-    && ok "briefing on PATH (~/.local/bin/briefing)" || bad "briefing not on PATH (run bin/briefing install)"
-
-  # Vibe: symlinks can't go stale, just verify they point at the hub
-  if command -v vibe >/dev/null; then
-    [ "$(readlink "$HOME/.vibe/AGENTS.md" 2>/dev/null)" = "$DIRECTIONS" ] \
-      && ok "vibe: ~/.vibe/AGENTS.md -> directions" || bad "vibe: ~/.vibe/AGENTS.md not linked"
-    [ "$(readlink "$HOME/.vibe/skills" 2>/dev/null)" = "$HUB/skills" ] \
-      && ok "vibe: ~/.vibe/skills -> skills" || bad "vibe: ~/.vibe/skills not linked"
-  else skip "vibe: not installed"; fi
-
-  # Hermes: SOUL.md carries a generated copy, compare it against the source
-  if command -v hermes >/dev/null; then
-    if awk 'f{print} /briefing directions below/{f=1}' "$HOME/.hermes/SOUL.md" 2>/dev/null \
-         | sed '1{/^$/d}' | diff -q - "$DIRECTIONS" >/dev/null 2>&1; then
-      ok "hermes: SOUL.md directions section current"
+case "$CMD" in
+  install|link|sync|status|path)
+    source "$HUB/lib/cmd-$CMD.sh"
+    if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+      "cmd_${CMD}_help"
     else
-      stale "hermes: SOUL.md directions section (run briefing install)"
+      "cmd_$CMD" "$@"
     fi
-    [ "$(readlink "$HOME/.hermes/skills/briefing" 2>/dev/null)" = "$HUB/skills" ] \
-      && ok "hermes: skills mounted" || bad "hermes: skills not mounted"
-    for f in MEMORY.md USER.md; do
-      [ "$(readlink "$HOME/.hermes/memories/$f" 2>/dev/null)" = "$HUB/memory/hermes/$f" ] \
-        && ok "hermes: $f captured" || bad "hermes: $f not captured"
-    done
-  else skip "hermes: not installed"; fi
-
-  echo
-  echo "projects"
-  if [ -s "$REG" ]; then
-    while IFS= read -r p; do
-      echo "  $(basename "$p")"
-      if [ ! -d "$p" ]; then bad "  directory gone ($p)"; continue; fi
-      # Cursor rule: generated copy, 4-line frontmatter then directions verbatim
-      if tail -n +5 "$p/.cursor/rules/briefing.mdc" 2>/dev/null | diff -q - "$DIRECTIONS" >/dev/null 2>&1; then
-        ok "  briefing.mdc current"
-      else
-        stale "  briefing.mdc (run briefing link)"
-      fi
-      if [ -f "$p/AGENTS.md" ]; then
-        [ "$(readlink "$p/HERMES.md" 2>/dev/null)" = "$p/AGENTS.md" ] \
-          && ok "  HERMES.md mirror" || bad "  HERMES.md mirror missing"
-      else
-        skip "  no AGENTS.md (no HERMES.md mirror)"
-      fi
-      if [ -f "$p/.briefing-skills" ]; then
-        while IFS= read -r s; do
-          [ -z "$s" ] || [ "${s:0:1}" = "#" ] && continue
-          miss=""
-          for t in .vibe/skills .cursor/skills; do
-            [ "$(readlink "$p/$t/$s" 2>/dev/null)" = "$HUB/skills/$s" ] || miss="$miss $t"
-          done
-          [ -z "$miss" ] && ok "  skill $s" || bad "  skill $s missing in:$miss"
-        done < "$p/.briefing-skills"
-      fi
-    done < "$REG"
-  else
-    skip "no projects registered (run briefing link <dir>)"
-  fi
-
-  echo
-  echo "repo"
-  local dirty ahead
-  dirty="$(git status --porcelain | wc -l)"
-  if [ "$dirty" -eq 0 ]; then
-    ok "working tree clean"
-  else
-    stale "$dirty uncommitted file(s), review and run briefing sync"
-    git status --porcelain | sed 's/^/        /'
-  fi
-  ahead="$(git rev-list --count @{upstream}..HEAD 2>/dev/null || echo '?')"
-  [ "$ahead" = "0" ] && ok "in sync with origin" || stale "$ahead commit(s) not pushed"
-
-  exit "$FAIL"
-}
-
-case "${1:-}" in
-  install) cmd_install ;;
-  link)    cmd_link "${2:?usage: briefing link <project-dir>}" ;;
-  sync)    cmd_sync "${2:-}" ;;
-  status)  cmd_status ;;
-  path)    cmd_path ;;
-  ""|-h|--help|help) usage ;;
-  *) echo "unknown command: $1" >&2; usage >&2; exit 2 ;;
+    ;;
+  help) show_help ;;
+  *) printf 'unknown command: %s\n\n' "$CMD" >&2; show_help >&2; exit 2 ;;
 esac

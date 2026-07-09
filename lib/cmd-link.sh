@@ -1,0 +1,66 @@
+# briefing link - wire a project to the hub
+
+cmd_link_help() {
+  cat <<'EOF'
+briefing link - wire a project directory to the briefing repo
+
+Usage:
+  briefing [-n|--dry-run] link <project-dir>
+
+What it does (idempotent):
+  1. links each skill named in the project's .briefing-skills manifest
+     into .vibe/skills/ and .cursor/skills/ (and prunes links for skills
+     removed from the manifest)
+  2. mirrors the project's AGENTS.md as HERMES.md (symlink)
+  3. generates .cursor/rules/briefing.mdc from directions/AGENTS.md
+  4. registers the project so `briefing install` re-links it in future
+
+Gitignore the generated files in the project:
+  .vibe/skills/  .cursor/skills/  .cursor/rules/briefing.mdc  HERMES.md
+EOF
+}
+
+cmd_link() {
+  local PROJECT MANIFEST TARGET l s
+  PROJECT="$(cd "${1:?usage: briefing link <project-dir>}" && pwd)"
+  MANIFEST="$PROJECT/.briefing-skills"
+
+  # 1. Skills: link manifest entries into each agent's project skills dir
+  if [[ -f "$MANIFEST" ]]; then
+    for TARGET in "$PROJECT/.vibe/skills" "$PROJECT/.cursor/skills"; do
+      run mkdir -p "$TARGET"
+      for l in "$TARGET"/*; do            # drop links no longer in the manifest
+        [[ -L "$l" ]] || continue
+        case "$(readlink "$l")" in "$HUB/skills/"*)
+          grep -qxF "$(basename "$l")" "$MANIFEST" || run rm "$l" ;;
+        esac
+      done
+      while IFS= read -r s; do
+        [[ -z "$s" || "${s:0:1}" == "#" ]] && continue
+        [[ -d "$HUB/skills/$s" ]] || die "unknown skill: $s (not in $HUB/skills/)"
+        run ln -sfn "$HUB/skills/$s" "$TARGET/$s"
+      done < "$MANIFEST"
+    done
+  fi
+
+  # 2. Hermes project rules: mirror the project's AGENTS.md
+  [[ -f "$PROJECT/AGENTS.md" ]] && run ln -sfn "$PROJECT/AGENTS.md" "$PROJECT/HERMES.md"
+
+  # 3. Cursor: global directions as an always-on rule (generated, single source)
+  run mkdir -p "$PROJECT/.cursor/rules"
+  { printf -- '---\ndescription: briefing directions (generated, edit %s)\nalwaysApply: true\n---\n' "$DIRECTIONS"
+    cat "$DIRECTIONS"
+  } | write_file "$PROJECT/.cursor/rules/briefing.mdc"
+
+  # 4. Register (machine-local) so `briefing install` re-links this project
+  run mkdir -p "$(dirname "$REG")"
+  if ! grep -qxF "$PROJECT" "$REG" 2>/dev/null; then
+    if [[ "$DRY_RUN" == "1" ]]; then
+      printf 'would register: %s in %s\n' "$PROJECT" "$REG"
+    else
+      echo "$PROJECT" >> "$REG"
+    fi
+  fi
+
+  info "linked: $PROJECT"
+}

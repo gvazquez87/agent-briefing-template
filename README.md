@@ -48,7 +48,12 @@ memory/               → canonical long-form memory (append-only)
 skills/               → reusable procedures, one directory per skill
 adapters/             → per-agent global wiring, run by `briefing install`
 bin/briefing          → the one command: install | link | sync | status | path
+lib/                  → command implementations and shared helpers
+test/e2e.sh           → self-contained end-to-end test (throwaway HOME)
 ```
+
+Every command supports `--help`, and `briefing --dry-run <command>` prints
+what would change without changing it.
 
 ## How each agent gets the directions
 

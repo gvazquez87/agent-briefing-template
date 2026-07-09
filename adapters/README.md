@@ -1,8 +1,8 @@
 # Adapters
 
 An adapter wires one agent to this repo. `briefing install` runs every
-`adapters/*.sh` (except `_lib.sh`), so adding support for a new agent means
-adding one file here. No registration, no config.
+`adapters/*.sh`, so adding support for a new agent means adding one file
+here. No registration, no config.
 
 ## The contract
 
@@ -21,8 +21,8 @@ Each adapter must:
    (`HUB="$(cd "$(dirname "$0")/.." && pwd)"`), the user's home from `$HOME`.
    Never hardcode a clone location or a username.
 
-4. **Never destroy user files.** Use the `link` helper from `_lib.sh`: if the
-   destination is a real file or directory, it is moved to a
+4. **Never destroy user files.** Use the `link` helper from `lib/common.sh`:
+   if the destination is a real file or directory, it is moved to a
    `.pre-briefing.bak` backup before the symlink is created.
 
 5. **Only touch its own agent's config.** An adapter for agent X writes under
@@ -32,6 +32,20 @@ Each adapter must:
 6. **Prefer symlinks over copies.** Symlinks never go stale. Use a generated
    copy only when the agent cannot follow a symlink or needs a merged file
    (see `hermes.sh`, which regenerates a marked section of `SOUL.md`).
+
+7. **Honor dry runs.** Wrap every mutating call in `run` (from
+   `lib/common.sh`) and use `link`/`write_file` for symlinks and generated
+   files, so `briefing --dry-run install` prints what would change without
+   changing it. The standard adapter opener:
+
+   ```bash
+   #!/usr/bin/env bash
+   set -euo pipefail
+   HUB="$(cd "$(dirname "$0")/.." && pwd)"
+   source "$HUB/lib/log.sh"
+   source "$HUB/lib/common.sh"
+   command -v myagent >/dev/null || exit 0
+   ```
 
 ## Delivery patterns
 

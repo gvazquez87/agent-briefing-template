@@ -1,10 +1,14 @@
 #!/usr/bin/env bash
+# ------------------------------------------------
+# vibe.sh - wire Vibe to the hub (pure symlinks, can never go stale)
+# ------------------------------------------------
 set -euo pipefail
-source "$(dirname "$0")/_lib.sh"
 HUB="$(cd "$(dirname "$0")/.." && pwd)"
+source "$HUB/lib/log.sh"
+source "$HUB/lib/common.sh"
 command -v vibe >/dev/null || exit 0
 
-mkdir -p "$HOME/.vibe"
+run mkdir -p "$HOME/.vibe"
 link "$HUB/directions/AGENTS.md" "$HOME/.vibe/AGENTS.md"   # user-level, always-on
 link "$HUB/skills"               "$HOME/.vibe/skills"      # all skills available globally
-echo "vibe: ok"
+info "vibe: ok"
