@@ -1,8 +1,29 @@
 # agent-briefing-template
 
+[![CI](https://github.com/gvazquez87/agent-briefing-template/actions/workflows/ci.yml/badge.svg)](https://github.com/gvazquez87/agent-briefing-template/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/gvazquez87/agent-briefing-template)](https://github.com/gvazquez87/agent-briefing-template/releases)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 A personal agent context hub: one **private** repo that carries your always-on
 directions, long-form memory, and reusable skills to every machine and every
-agent (Hermes, Vibe, Cursor, and anything you write an adapter for).
+agent (Claude Code, Cursor, Hermes, Vibe — and anything you write an adapter
+for).
+
+```mermaid
+flowchart LR
+    hub["<b>your private hub repo</b><br/>directions · memory · skills"]
+    hub -->|briefing install| global["global wiring<br/>~/.claude · ~/.vibe · ~/.hermes"]
+    hub -->|briefing link| project["per-project delivery<br/>briefing.mdc · mirrors · skill links"]
+    global --> agents(["every agent,<br/>every session,<br/>every machine"])
+    project --> agents
+```
+
+This is **not a project rule syncer**. Tools in that category take one set of
+project rules and fan them out into every agent's native format; this hub owns
+the layer above that — the one that is *yours*. It follows you across machines
+and projects, and agents can read and extend what they know about you without
+ever rewriting history. Project rules still live in each project's own
+`AGENTS.md`; the two layers compose cleanly.
 
 **Key ideas:**
 
@@ -50,9 +71,9 @@ On every additional machine, repeat step 2. That's the whole deployment.
 ```
 directions/AGENTS.md  → always-on universal rules, injected into every agent
 memory/               → canonical long-form memory (append-only)
-│  ├─ preferences.md     → who you are, how you work
-│  ├─ projects.md        → per-project facts an agent should know cold
-│  └─ hermes/            → Hermes tier-1 memory, captured via symlinks
+   ├─ preferences.md     → who you are, how you work
+   ├─ projects.md        → per-project facts an agent should know cold
+   └─ hermes/            → Hermes tier-1 memory, captured via symlinks
 skills/               → reusable procedures, one directory per skill
 adapters/             → per-agent global wiring, run by `briefing install`
 bin/briefing          → the one command: install | adopt | link | unlink | sync | status | path | uninstall
@@ -158,7 +179,7 @@ Your copy is a normal repo. To pull future improvements to the machinery
 ```bash
 git remote add upstream https://github.com/gvazquez87/agent-briefing-template.git
 git fetch upstream --tags
-git merge v0.1.0   # pick the latest release tag
+git merge v0.3.0   # pick the latest release tag
 ```
 
 Check [CHANGELOG.md](CHANGELOG.md) for migration notes before merging. Machinery
