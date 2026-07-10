@@ -2,11 +2,56 @@
 # ------------------------------------------------
 # hermes.sh - wire Hermes to the hub: skills mount, memory capture,
 # and a generated directions section inside SOUL.md
+#
+# Called bare (or with "install") by `briefing install`; called with
+# "remove" by `briefing uninstall` to undo the wiring, copy captured
+# memory back to real files, and strip the generated SOUL.md section.
 # ------------------------------------------------
 set -euo pipefail
 HUB="$(cd "$(dirname "$0")/.." && pwd)"
 source "$HUB/lib/log.sh"
 source "$HUB/lib/common.sh"
+MODE="${1:-install}"
+
+if [[ "$MODE" == "remove" ]]; then
+  # Clean up even when the hermes binary is gone; leftovers don't need it.
+  unwire "$HOME/.hermes/skills/briefing" "$HUB/skills"
+
+  # Memory: after adoption the repo holds the only copy, so removing the
+  # symlink alone would erase Hermes's memory. Materialize it back instead.
+  for f in MEMORY.md USER.md; do
+    src="$HOME/.hermes/memories/$f"; dst="$HUB/memory/hermes/$f"
+    if [[ "$(readlink "$src" 2>/dev/null)" == "$dst" ]]; then
+      run rm "$src"
+      run cp "$dst" "$src"
+    fi
+  done
+
+  # SOUL.md: strip the generated directions section, keep the identity
+  # above the marker. Remove the file only when nothing of the user's is left.
+  SOUL="$HOME/.hermes/SOUL.md"
+  if [[ -f "$SOUL" ]] && grep -q 'briefing directions below' "$SOUL"; then
+    tmp="$(mktemp)"
+    awk 'index($0, "briefing directions below"){exit} {lines[NR]=$0; n=NR}
+         END{while(n>0 && lines[n]=="") n--; for(i=1;i<=n;i++) print lines[i]}' \
+      "$SOUL" > "$tmp"
+    if [[ ! -s "$tmp" ]]; then
+      run rm "$SOUL"
+      rm "$tmp"
+    elif [[ "${DRY_RUN:-0}" == "1" ]]; then
+      printf 'would strip: %s (generated directions section)\n' "$SOUL"
+      rm "$tmp"
+    else
+      mv "$tmp" "$SOUL"
+    fi
+  fi
+
+  # write_approval was set unconditionally on install; the previous value
+  # was never recorded, so it is left as-is.
+  info "hermes: removed (write_approval config left as-is)"
+  exit 0
+fi
+
 command -v hermes >/dev/null || exit 0
 
 # Mount briefing skills as one category; Hermes's bundled/own skills untouched
@@ -37,7 +82,10 @@ if [[ -f "$SOUL" ]]; then
        END{while(n>0 && lines[n]=="") n--; for(i=1;i<=n;i++) print lines[i]}' \
     "$SOUL" > "$tmp"
 fi
-printf '\n%s\n\n' "$MARK" >> "$tmp"
+# The sha256 stamp records the directions content as generated, so `status`
+# can tell a hand-edited section from a merely outdated one.
+printf '\n%s\n<!-- briefing-sha256: %s -->\n\n' \
+  "$MARK" "$(hash_stdin < "$HUB/directions/AGENTS.md")" >> "$tmp"
 cat "$HUB/directions/AGENTS.md" >> "$tmp"
 if [[ "${DRY_RUN:-0}" == "1" ]]; then
   printf 'would regenerate: %s (directions section)\n' "$SOUL"

@@ -44,8 +44,19 @@ Each adapter must:
    HUB="$(cd "$(dirname "$0")/.." && pwd)"
    source "$HUB/lib/log.sh"
    source "$HUB/lib/common.sh"
+   MODE="${1:-install}"
+   # ... handle remove mode first (see rule 8), then:
    command -v myagent >/dev/null || exit 0
    ```
+
+8. **Support remove mode.** `briefing uninstall` runs every adapter with
+   `remove` as the first argument. In that mode, undo your wiring and exit:
+   use the `unwire` helper from `lib/common.sh` for symlinks (it removes
+   only links that point into this hub and restores `.pre-briefing.bak`
+   backups), copy any captured memory back to real files (the repo may hold
+   the only copy!), and strip any generated sections while preserving the
+   user's own content. Do not gate remove mode on the agent binary being
+   installed; leftovers should be cleaned up even after the agent is gone.
 
 ## Delivery patterns
 

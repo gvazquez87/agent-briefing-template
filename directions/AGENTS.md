@@ -19,3 +19,6 @@
   Never edit or delete existing entries. Never modify directions/.
 - Before appending, read the target file; skip facts already recorded there
   (in any wording).
+- To replace an outdated fact, append the new bullet ending with
+  (supersedes: "<short quote of the old bullet>"). Never edit the old line;
+  the memory-curator skill collapses the pair later.

@@ -33,11 +33,35 @@ cmd_status() {
       && ok "vibe: ~/.vibe/skills -> skills" || bad "vibe: ~/.vibe/skills not linked"
   else skip "vibe: not installed"; fi
 
-  # Hermes: SOUL.md carries a generated copy, compare it against the source
+  # Claude: CLAUDE.md symlink plus one link per hub skill
+  if command -v claude >/dev/null; then
+    [[ "$(readlink "$HOME/.claude/CLAUDE.md" 2>/dev/null)" == "$DIRECTIONS" ]] \
+      && ok "claude: ~/.claude/CLAUDE.md -> directions" || bad "claude: ~/.claude/CLAUDE.md not linked"
+    local sk sk_missing=""
+    for sk in "$HUB"/skills/*/; do
+      [[ -d "$sk" ]] || continue
+      sk="$(basename "$sk")"
+      [[ "$(readlink "$HOME/.claude/skills/$sk" 2>/dev/null)" == "$HUB/skills/$sk" ]] \
+        || sk_missing="$sk_missing $sk"
+    done
+    [[ -z "$sk_missing" ]] \
+      && ok "claude: skills linked" || bad "claude: skills not linked:$sk_missing"
+  else skip "claude: not installed"; fi
+
+  # Hermes: SOUL.md carries a generated copy, compare it against the source.
+  # The sha256 stamp (recorded at generation) tells a hand-edited section
+  # (body no longer matches its own stamp) from a merely outdated one.
   if command -v hermes >/dev/null; then
-    if awk 'f{print} index($0, "briefing directions below"){f=1}' "$HOME/.hermes/SOUL.md" 2>/dev/null \
-         | sed '1{/^$/d}' | diff -q - "$DIRECTIONS" >/dev/null 2>&1; then
+    local soul soul_body soul_sha
+    soul="$HOME/.hermes/SOUL.md"
+    soul_body="$(awk 'f && $0 !~ /^<!-- briefing-sha256/ {print}
+                      index($0, "briefing directions below"){f=1}' "$soul" 2>/dev/null \
+                 | sed '1{/^$/d;}')"
+    soul_sha="$(sed -n 's/^<!-- briefing-sha256: \([0-9a-f]*\) -->$/\1/p' "$soul" 2>/dev/null | head -1)"
+    if printf '%s\n' "$soul_body" | diff -q - "$DIRECTIONS" >/dev/null 2>&1; then
       ok "hermes: SOUL.md directions section current"
+    elif [[ -n "$soul_sha" && "$(printf '%s\n' "$soul_body" | hash_stdin)" != "$soul_sha" ]]; then
+      bad "hermes: SOUL.md directions section HAND-EDITED - edits there are lost on the next install; move them into directions/AGENTS.md (or above the marker)"
     else
       stale "hermes: SOUL.md directions section (run briefing install)"
     fi
@@ -53,7 +77,7 @@ cmd_status() {
   echo
   echo "projects"
   if [[ -s "$REG" ]]; then
-    local p s t miss wrong other mdc mdc_hub mdc_ver cur_ver
+    local p s t miss wrong other mdc mdc_hub mdc_ver mdc_sha cur_ver
     cur_ver="$(hub_version)"
     while IFS= read -r p; do
       echo "  $(basename "$p")"
@@ -65,6 +89,7 @@ cmd_status() {
       mdc="$p/.cursor/rules/briefing.mdc"
       mdc_hub="$(sed -n 's/^briefing-hub: //p' "$mdc" 2>/dev/null | head -1)"
       mdc_ver="$(sed -n 's/^briefing-version: //p' "$mdc" 2>/dev/null | head -1)"
+      mdc_sha="$(sed -n 's/^briefing-sha256: //p' "$mdc" 2>/dev/null | head -1)"
       if [[ ! -f "$mdc" ]]; then
         bad "  briefing.mdc missing (run briefing link $p)"
       elif [[ -n "$mdc_hub" && "$mdc_hub" != "$HUB" ]]; then
@@ -72,6 +97,11 @@ cmd_status() {
       elif awk 'body{print;next} /^---$/ && ++n==2 {body=1}' "$mdc" \
              | diff -q - "$DIRECTIONS" >/dev/null 2>&1; then
         ok "  briefing.mdc current"
+      elif [[ -n "$mdc_sha" && "$(awk 'body{print;next} /^---$/ && ++n==2 {body=1}' "$mdc" | hash_stdin)" != "$mdc_sha" ]]; then
+        # Body no longer matches the stamp it was generated with: someone
+        # edited the generated copy. Louder than stale, because those edits
+        # are silently destroyed by the next link/install.
+        bad "  briefing.mdc HAND-EDITED - edits there are lost on the next link; move them into $DIRECTIONS or the project's AGENTS.md"
       elif [[ -n "$mdc_ver" && "$mdc_ver" != "$cur_ver" ]]; then
         stale "  briefing.mdc outdated: generated at $mdc_ver, hub is at $cur_ver (run briefing link $p)"
       else
@@ -80,8 +110,16 @@ cmd_status() {
       if [[ -f "$p/AGENTS.md" ]]; then
         [[ "$(readlink "$p/HERMES.md" 2>/dev/null)" == "$p/AGENTS.md" ]] \
           && ok "  HERMES.md mirror" || bad "  HERMES.md mirror missing"
+        # a real committed CLAUDE.md is fine; only a missing path is a problem
+        if [[ "$(readlink "$p/CLAUDE.md" 2>/dev/null)" == "$p/AGENTS.md" ]]; then
+          ok "  CLAUDE.md mirror"
+        elif [[ -f "$p/CLAUDE.md" && ! -L "$p/CLAUDE.md" ]]; then
+          skip "  CLAUDE.md is the project's own file (no mirror needed)"
+        else
+          bad "  CLAUDE.md mirror missing"
+        fi
       else
-        skip "  no AGENTS.md (no HERMES.md mirror)"
+        skip "  no AGENTS.md (no HERMES.md/CLAUDE.md mirrors)"
       fi
       if [[ -f "$p/.briefing-skills" ]]; then
         while IFS= read -r s; do
@@ -93,7 +131,7 @@ cmd_status() {
           # A link that exists but points at a different hub is not
           # "missing"; report it as what it is.
           miss="" wrong="" other=""
-          for t in .vibe/skills .cursor/skills; do
+          for t in .vibe/skills .cursor/skills .claude/skills; do
             if [[ "$(readlink "$p/$t/$s" 2>/dev/null)" == "$HUB/skills/$s" ]]; then
               continue
             elif [[ -L "$p/$t/$s" ]]; then
@@ -118,7 +156,7 @@ cmd_status() {
   echo
   echo "repo"
   local dirty ahead
-  dirty="$(git status --porcelain | wc -l)"
+  dirty="$(git status --porcelain | wc -l | tr -d '[:space:]')"   # BSD wc pads with spaces
   if [[ "$dirty" -eq 0 ]]; then
     ok "working tree clean"
   else

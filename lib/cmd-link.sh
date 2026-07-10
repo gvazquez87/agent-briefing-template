@@ -9,14 +9,15 @@ Usage:
 
 What it does (idempotent):
   1. links each skill named in the project's .briefing-skills manifest
-     into .vibe/skills/ and .cursor/skills/ (and prunes links for skills
-     removed from the manifest)
-  2. mirrors the project's AGENTS.md as HERMES.md (symlink)
+     into .vibe/skills/, .cursor/skills/, and .claude/skills/ (and prunes
+     links for skills removed from the manifest)
+  2. mirrors the project's AGENTS.md as HERMES.md and CLAUDE.md (symlinks)
   3. generates .cursor/rules/briefing.mdc from directions/AGENTS.md
   4. registers the project so `briefing install` re-links it in future
 
 Gitignore the generated files in the project:
-  .vibe/skills/  .cursor/skills/  .cursor/rules/briefing.mdc  HERMES.md
+  .vibe/skills/  .cursor/skills/  .claude/skills/
+  .cursor/rules/briefing.mdc  HERMES.md  CLAUDE.md
 EOF
 }
 
@@ -27,7 +28,7 @@ cmd_link() {
 
   # 1. Skills: link manifest entries into each agent's project skills dir
   if [[ -f "$MANIFEST" ]]; then
-    for TARGET in "$PROJECT/.vibe/skills" "$PROJECT/.cursor/skills"; do
+    for TARGET in "$PROJECT/.vibe/skills" "$PROJECT/.cursor/skills" "$PROJECT/.claude/skills"; do
       run mkdir -p "$TARGET"
       for l in "$TARGET"/*; do            # drop links no longer in the manifest
         [[ -L "$l" ]] || continue
@@ -44,15 +45,24 @@ cmd_link() {
     done
   fi
 
-  # 2. Hermes project rules: mirror the project's AGENTS.md
-  [[ -f "$PROJECT/AGENTS.md" ]] && run ln -sfn "$PROJECT/AGENTS.md" "$PROJECT/HERMES.md"
+  # 2. Hermes and Claude project rules: mirror the project's AGENTS.md.
+  # A real committed CLAUDE.md wins - Claude reads it natively - so the
+  # mirror is only created when the path is free or already a symlink.
+  if [[ -f "$PROJECT/AGENTS.md" ]]; then
+    run ln -sfn "$PROJECT/AGENTS.md" "$PROJECT/HERMES.md"
+    if [[ ! -e "$PROJECT/CLAUDE.md" || -L "$PROJECT/CLAUDE.md" ]]; then
+      run ln -sfn "$PROJECT/AGENTS.md" "$PROJECT/CLAUDE.md"
+    else
+      skip "left CLAUDE.md alone (real file; Claude reads it natively)"
+    fi
+  fi
 
   # 3. Cursor: global directions as an always-on rule (generated, single
   # source). The frontmatter records which hub produced it and at what
   # version, so `status` can explain divergence precisely.
   run mkdir -p "$PROJECT/.cursor/rules"
-  { printf -- '---\ndescription: briefing directions (generated, edit %s)\nbriefing-hub: %s\nbriefing-version: %s\nalwaysApply: true\n---\n' \
-      "$DIRECTIONS" "$HUB" "$(hub_version)"
+  { printf -- '---\ndescription: briefing directions (generated, edit %s)\nbriefing-hub: %s\nbriefing-version: %s\nbriefing-sha256: %s\nalwaysApply: true\n---\n' \
+      "$DIRECTIONS" "$HUB" "$(hub_version)" "$(hash_stdin < "$DIRECTIONS")"
     cat "$DIRECTIONS"
   } | write_file "$PROJECT/.cursor/rules/briefing.mdc"
 

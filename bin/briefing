@@ -10,8 +10,16 @@
 # ------------------------------------------------
 set -euo pipefail
 
-# Resolve the hub even when invoked through the ~/.local/bin symlink
-HUB="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"
+# Resolve the hub even when invoked through the ~/.local/bin symlink.
+# (a loop instead of `readlink -f`, which macOS only gained in 12.3)
+SELF="${BASH_SOURCE[0]}"
+while [[ -L "$SELF" ]]; do
+  TARGET="$(readlink "$SELF")"
+  [[ "$TARGET" == /* ]] || TARGET="$(dirname "$SELF")/$TARGET"
+  SELF="$TARGET"
+done
+HUB="$(cd "$(dirname "$SELF")/.." && pwd)"
+unset SELF TARGET
 STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/briefing"
 REG="$STATE_DIR/linked-projects"
 DIRECTIONS="$HUB/directions/AGENTS.md"
@@ -29,10 +37,13 @@ Usage:
 
 Commands:
   install         wire every installed agent to this repo (idempotent)
+  adopt [file..]  import existing instruction files into directions/AGENTS.md
   link <dir>      wire a project: skills manifest, HERMES.md mirror, Cursor rule
+  unlink <dir>    detach a project: remove generated files and hub-owned links
   sync [msg]      commit memory changes, pull --rebase, reinstall, push
   status          health check: global wiring, projects, repo state
   path            print where this repo lives
+  uninstall       undo everything on this machine (the repo stays untouched)
   help            show this message
 
 Options (accepted before or after the command):
@@ -85,7 +96,7 @@ either run '$registered/bin/briefing $1' or adopt this checkout first with '$HUB
 }
 
 case "$CMD" in
-  install|link|sync|status|path)
+  install|adopt|link|unlink|sync|status|path|uninstall)
     source "$HUB/lib/cmd-$CMD.sh"
     if [[ "$HELP" == 1 ]]; then
       "cmd_${CMD}_help"
