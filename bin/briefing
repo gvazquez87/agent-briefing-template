@@ -38,6 +38,7 @@ Commands:
 Options (accepted before or after the command):
   -n, --dry-run   print mutating actions instead of performing them
   -h, --help      show help (also per command: briefing <command> --help)
+  -V, --version   print version and exit
 
 Exit codes:
   0 = success (status: everything healthy)
@@ -48,17 +49,23 @@ EOF
 
 # Flags are accepted anywhere (before or after the command); anything else
 # starting with a dash is an error instead of being silently ignored.
-CMD="" HELP=0
+CMD="" HELP=0 VERSION=0
 ARGS=()
 for arg in "$@"; do
   case "$arg" in
     -n|--dry-run) DRY_RUN=1 ;;
     -h|--help)    HELP=1 ;;
+    -V|--version) VERSION=1 ;;
     -*) printf 'unknown option: %s\n\n' "$arg" >&2; show_help >&2; exit 2 ;;
     *)  if [[ -z "$CMD" ]]; then CMD="$arg"; else ARGS+=("$arg"); fi ;;
   esac
 done
 [[ -z "$CMD" ]] && CMD=help
+
+if [[ "$VERSION" == 1 ]]; then
+  printf 'briefing %s\n' "$(tr -d '[:space:]' < "$HUB/VERSION")"
+  exit 0
+fi
 
 # One machine, one hub: refuse to judge or rewire state from a checkout that
 # is not the registered hub. `briefing install` is the explicit adoption path.

@@ -1,0 +1,49 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify tag matches VERSION
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          version="$(tr -d '[:space:]' < VERSION)"
+          if [[ "$tag" != "$version" ]]; then
+            echo "tag v$tag does not match VERSION ($version)" >&2
+            exit 1
+          fi
+
+      - name: Run end-to-end tests
+        run: test/e2e.sh
+
+      - name: Extract release notes
+        id: notes
+        run: |
+          version="$(tr -d '[:space:]' < VERSION)"
+          awk -v ver="$version" '
+            $0 == "## [" ver "]" { capture = 1; next }
+            capture && /^## \[/ { exit }
+            capture { print }
+          ' CHANGELOG.md > release-notes.md
+          if [[ ! -s release-notes.md ]]; then
+            echo "no CHANGELOG section for [$version]" >&2
+            exit 1
+          fi
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            --title "${GITHUB_REF_NAME}" \
+            --notes-file release-notes.md

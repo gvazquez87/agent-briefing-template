@@ -122,16 +122,21 @@ touches nothing outside a temp directory, so it is safe to run anywhere.
 
 ## Staying current with this template
 
-Your copy is a normal repo; to pull future improvements to the machinery
-(`bin/`, `adapters/`), add this template as a second remote:
+Your copy is a normal repo. To pull future improvements to the machinery
+(`bin/`, `adapters/`), add this template as a second remote and merge a
+**release tag** (not `main`):
 
 ```bash
 git remote add upstream https://github.com/gvazquez87/agent-briefing-template.git
-git fetch upstream
-git merge upstream/main
+git fetch upstream --tags
+git merge v0.1.0   # pick the latest release tag
 ```
 
-Machinery and content live in disjoint paths, so merges are normally clean.
+Check [CHANGELOG.md](CHANGELOG.md) for migration notes before merging. Machinery
+and content live in disjoint paths, so merges are normally clean.
+
+To hear about new releases, watch this repo on GitHub (Watch → Custom →
+Releases) or subscribe to the [releases feed](https://github.com/gvazquez87/agent-briefing-template/releases.atom).
 
 ## License
 

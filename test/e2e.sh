@@ -37,6 +37,8 @@ DIRECTIONS="$HUB/directions/AGENTS.md"
 
 echo "== 2. help and dry run before anything exists =="
 "$HUB/bin/briefing" --help | grep -q 'install' || fail "top-level help"
+[ "$("$HUB/bin/briefing" --version)" = "briefing $(tr -d '[:space:]' < "$HUB/VERSION")" ] || fail "--version"
+pass "--version prints VERSION file"
 "$HUB/bin/briefing" install --help | grep -q 'idempotent' || fail "per-command help"
 "$HUB/bin/briefing" --dry-run install > "$T/dryrun.out"
 grep -q 'would' "$T/dryrun.out" || fail "dry run printed no actions"
