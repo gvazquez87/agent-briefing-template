@@ -4,10 +4,14 @@
 [![Release](https://img.shields.io/github/v/release/gvazquez87/agent-briefing-template)](https://github.com/gvazquez87/agent-briefing-template/releases)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-A personal agent context hub: one **private** repo that carries your always-on
-directions, long-form memory, and reusable skills to every machine and every
-agent (Claude Code, Cursor, Hermes, Vibe — and anything you write an adapter
-for).
+Every AI coding agent asks you to teach it the same things: how you work,
+what you care about, and the long-term context behind your projects. Each
+stores that knowledge in its own format, tied to one tool or one machine.
+
+**agent-briefing** makes one **private** repository the canonical source of your
+directions, long-form memory, and reusable skills, then delivers them to
+every supported agent on every machine (Claude Code, Cursor, Hermes, Vibe,
+and anything you write an adapter for).
 
 ```mermaid
 flowchart LR
@@ -17,6 +21,8 @@ flowchart LR
     global --> agents(["every agent,<br/>every session,<br/>every machine"])
     project --> agents
 ```
+
+![briefing install, link, status, drift repair, and sync in action](https://github.com/gvazquez87/agent-briefing-template/releases/latest/download/demo.gif)
 
 This is **not a project rule syncer**. Tools in that category take one set of
 project rules and fan them out into every agent's native format; this hub owns
