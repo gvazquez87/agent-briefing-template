@@ -24,6 +24,13 @@ link() {
   run ln -sfn "$1" "$2"
 }
 
+# hub_version - human-readable stamp of the hub's current state (tag, commit,
+# dirty marker). Written into generated files so `status` can tell *why* a
+# copy diverged instead of just reporting that it did.
+hub_version() {
+  git -C "$HUB" describe --tags --always --dirty 2>/dev/null || echo unknown
+}
+
 # write_file DST - write stdin to DST, honoring dry runs (input is discarded
 # but still consumed, so pipelines behave identically in both modes).
 write_file() {

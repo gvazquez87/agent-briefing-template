@@ -33,12 +33,18 @@ cmd_install() {
     bash "$a"
   done
 
-  # Re-link every registered project so generated copies never go stale
+  # Re-link every registered project so generated copies never go stale.
+  # One broken project (e.g. a manifest naming a skill this hub doesn't
+  # carry) must not stop the others from being re-linked.
   if [[ -f "$REG" ]]; then
     local p
     while IFS= read -r p; do
-      [[ -d "$p" ]] && cmd_link "$p"
+      if [[ ! -d "$p" ]]; then skip "skipped (directory gone): $p"; continue; fi
+      ( cmd_link "$p" ) || bad "link failed: $p"
     done < "$REG"
+  fi
+  if [[ "$FAIL" != 0 ]]; then
+    die "install finished with errors ($HUB), see messages above"
   fi
   info "install: ok ($HUB)"
 }

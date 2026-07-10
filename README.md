@@ -21,12 +21,12 @@ This is a **template repository**. Don't fork it; forks of public repos can't
 be made private, and this repo will hold your personal memory.
 
 1. Click **Use this template** on GitHub and create a **private** repo.
-2. Clone it anywhere (the scripts derive every path; `~/.local/briefing` is
-   just a nice convention) and install:
+2. Clone it anywhere (the scripts derive every path; `~/.local/agent-briefing`
+   is just a nice convention) and install:
 
    ```bash
-   git clone git@github.com:YOU/briefing.git ~/.local/briefing
-   ~/.local/briefing/bin/briefing install
+   git clone git@github.com:YOU/agent-briefing.git ~/.local/agent-briefing
+   ~/.local/agent-briefing/bin/briefing install
    ```
 
    `install` wires every agent it finds on the machine, and symlinks the

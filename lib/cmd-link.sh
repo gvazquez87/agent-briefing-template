@@ -37,7 +37,8 @@ cmd_link() {
       done
       while IFS= read -r s; do
         [[ -z "$s" || "${s:0:1}" == "#" ]] && continue
-        [[ -d "$HUB/skills/$s" ]] || die "unknown skill: $s (not in $HUB/skills/)"
+        [[ -d "$HUB/skills/$s" ]] \
+          || die "unknown skill: $s (not in $HUB/skills/; edit $MANIFEST or add the skill to the hub)"
         run ln -sfn "$HUB/skills/$s" "$TARGET/$s"
       done < "$MANIFEST"
     done
@@ -46,9 +47,12 @@ cmd_link() {
   # 2. Hermes project rules: mirror the project's AGENTS.md
   [[ -f "$PROJECT/AGENTS.md" ]] && run ln -sfn "$PROJECT/AGENTS.md" "$PROJECT/HERMES.md"
 
-  # 3. Cursor: global directions as an always-on rule (generated, single source)
+  # 3. Cursor: global directions as an always-on rule (generated, single
+  # source). The frontmatter records which hub produced it and at what
+  # version, so `status` can explain divergence precisely.
   run mkdir -p "$PROJECT/.cursor/rules"
-  { printf -- '---\ndescription: briefing directions (generated, edit %s)\nalwaysApply: true\n---\n' "$DIRECTIONS"
+  { printf -- '---\ndescription: briefing directions (generated, edit %s)\nbriefing-hub: %s\nbriefing-version: %s\nalwaysApply: true\n---\n' \
+      "$DIRECTIONS" "$HUB" "$(hub_version)"
     cat "$DIRECTIONS"
   } | write_file "$PROJECT/.cursor/rules/briefing.mdc"
 

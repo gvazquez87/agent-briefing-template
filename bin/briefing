@@ -35,7 +35,7 @@ Commands:
   path            print where this repo lives
   help            show this message
 
-Options:
+Options (accepted before or after the command):
   -n, --dry-run   print mutating actions instead of performing them
   -h, --help      show help (also per command: briefing <command> --help)
 
@@ -46,24 +46,45 @@ Exit codes:
 EOF
 }
 
-# Global flags
-while [[ "${1:-}" == -* ]]; do
-  case "$1" in
-    -n|--dry-run) DRY_RUN=1; shift ;;
-    -h|--help)    show_help; exit 0 ;;
-    *) printf 'unknown option: %s\n\n' "$1" >&2; show_help >&2; exit 2 ;;
+# Flags are accepted anywhere (before or after the command); anything else
+# starting with a dash is an error instead of being silently ignored.
+CMD="" HELP=0
+ARGS=()
+for arg in "$@"; do
+  case "$arg" in
+    -n|--dry-run) DRY_RUN=1 ;;
+    -h|--help)    HELP=1 ;;
+    -*) printf 'unknown option: %s\n\n' "$arg" >&2; show_help >&2; exit 2 ;;
+    *)  if [[ -z "$CMD" ]]; then CMD="$arg"; else ARGS+=("$arg"); fi ;;
   esac
 done
+[[ -z "$CMD" ]] && CMD=help
 
-CMD="${1:-help}"; shift || true
+# One machine, one hub: refuse to judge or rewire state from a checkout that
+# is not the registered hub. `briefing install` is the explicit adoption path.
+check_hub_identity() {
+  local registered
+  registered="$(cat "$STATE_DIR/hub" 2>/dev/null || true)"
+  if [[ -z "$registered" || "$registered" == "$HUB" ]]; then return 0; fi
+  if [[ ! -e "$registered/bin/briefing" ]]; then return 0; fi   # registered hub is gone, carry on
+  case "$1" in
+    path) return 0 ;;   # read-only, answers about this checkout by design
+    install) info "adopting $HUB as the hub (was: $registered)" ;;
+    *) die "this checkout is not the registered hub
+  running from:   $HUB
+  registered hub: $registered
+either run '$registered/bin/briefing $1' or adopt this checkout first with '$HUB/bin/briefing install'" ;;
+  esac
+}
 
 case "$CMD" in
   install|link|sync|status|path)
     source "$HUB/lib/cmd-$CMD.sh"
-    if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+    if [[ "$HELP" == 1 ]]; then
       "cmd_${CMD}_help"
     else
-      "cmd_$CMD" "$@"
+      check_hub_identity "$CMD"
+      "cmd_$CMD" ${ARGS[@]+"${ARGS[@]}"}
     fi
     ;;
   help) show_help ;;
