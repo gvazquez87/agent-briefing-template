@@ -70,6 +70,14 @@ hash_stdin() {
   fi
 }
 
+# emit_text FILE - print FILE with a guaranteed terminating newline (awk
+# treats an unterminated last line as a full record and print re-adds ORS).
+# Generated copies and their sha stamps are built from this normalized form:
+# the extraction pipelines in `status` re-terminate the last line anyway, so
+# a source file missing its final newline would otherwise diff/hash forever
+# as "hand-edited".
+emit_text() { awk 1 "$1"; }
+
 # write_file DST - write stdin to DST, honoring dry runs (input is discarded
 # but still consumed, so pipelines behave identically in both modes).
 write_file() {

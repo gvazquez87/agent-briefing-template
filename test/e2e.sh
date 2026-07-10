@@ -22,6 +22,9 @@ export PATH="$T/fakebin:$PATH"
 
 fail() { echo "FAIL: $1"; exit 1; }
 pass() { echo "  ok: $1"; }
+# print FILE with a guaranteed final newline; generated copies are built from
+# this normalized form (see emit_text in lib/common.sh)
+norm() { awk 1 "$1"; }
 
 echo "== 1. clone like a real user =="
 git clone -q "$TEMPLATE" "$T/.local/agent-briefing"
@@ -87,7 +90,7 @@ pass "claude wired (CLAUDE.md, per-skill links)"
 [ "$(readlink "$T/.hermes/skills/briefing")" = "$HUB/skills" ] || fail "hermes skills"
 [ "$(readlink "$T/.hermes/memories/MEMORY.md")" = "$HUB/memory/hermes/MEMORY.md" ] || fail "hermes MEMORY.md"
 awk 'f && $0 !~ /^<!-- briefing-sha256/ {print} index($0, "briefing directions below"){f=1}' "$T/.hermes/SOUL.md" \
-  | sed '1{/^$/d;}' | diff -q - "$DIRECTIONS" >/dev/null || fail "SOUL.md directions section"
+  | sed '1{/^$/d;}' | diff -q - <(norm "$DIRECTIONS") >/dev/null || fail "SOUL.md directions section"
 grep -q '^<!-- briefing-sha256: [0-9a-f]* -->$' "$T/.hermes/SOUL.md" || fail "SOUL.md sha stamp missing"
 pass "hermes wired (skills, memory capture, SOUL.md section with sha stamp)"
 
@@ -130,7 +133,7 @@ pass "HERMES.md mirrors AGENTS.md"
 pass "manifest skills linked for vibe, cursor, and claude ($FIRST_SKILL); CLAUDE.md mirror"
 head -1 "$P/.cursor/rules/briefing.mdc" | grep -qx -- '---' || fail "mdc frontmatter"
 awk 'body{print;next} /^---$/ && ++n==2 {body=1}' "$P/.cursor/rules/briefing.mdc" \
-  | diff -q - "$DIRECTIONS" >/dev/null || fail "mdc content"
+  | diff -q - <(norm "$DIRECTIONS") >/dev/null || fail "mdc content"
 grep -q "^briefing-hub: $HUB\$" "$P/.cursor/rules/briefing.mdc" || fail "mdc provenance: hub"
 grep -q '^briefing-version: .' "$P/.cursor/rules/briefing.mdc" || fail "mdc provenance: version"
 grep -q '^briefing-sha256: [0-9a-f]' "$P/.cursor/rules/briefing.mdc" || fail "mdc provenance: sha256"
@@ -327,6 +330,26 @@ grep -q 'stale.*SOUL.md directions section' "$T/status-soul-outdated.out" || fai
 "$HUB/bin/briefing" install >/dev/null
 "$HUB/bin/briefing" status >/dev/null || fail "install did not restore health after drift tests"
 pass "status tells hand-edited apart from outdated (SOUL.md); install repairs"
+
+echo "== 20b. directions file missing its final newline stays healthy =="
+# an editor stripping the trailing newline must break neither generation nor
+# drift detection (copies and sha stamps are newline-normalized)
+printf '%s' "$(cat "$DIRECTIONS")" > "$DIRECTIONS.tmp" && mv "$DIRECTIONS.tmp" "$DIRECTIONS"
+"$HUB/bin/briefing" install >/dev/null
+"$HUB/bin/briefing" link "$P" >/dev/null
+awk 'f && $0 !~ /^<!-- briefing-sha256/ {print} index($0, "briefing directions below"){f=1}' "$T/.hermes/SOUL.md" \
+  | sed '1{/^$/d;}' | diff -q - <(norm "$DIRECTIONS") >/dev/null || fail "SOUL.md section wrong without final newline"
+# the strip may dirty the repo (a stale, non-zero status); only the
+# generated-copy lines matter here
+"$HUB/bin/briefing" status > "$T/status-nonl.out" 2>&1 || true
+grep -q 'SOUL.md directions section current' "$T/status-nonl.out" || fail "SOUL.md section not current without final newline"
+grep -q 'briefing.mdc current' "$T/status-nonl.out" || fail "briefing.mdc not current without final newline"
+grep -q 'HAND-EDITED' "$T/status-nonl.out" && fail "missing final newline misreported as hand-edited"
+git -C "$HUB" checkout -q -- directions/AGENTS.md
+"$HUB/bin/briefing" install >/dev/null
+"$HUB/bin/briefing" link "$P" >/dev/null
+"$HUB/bin/briefing" status >/dev/null || fail "status not green after restoring the newline"
+pass "missing final newline breaks neither generation nor drift detection"
 
 echo "== 21. unlink detaches a project, leaves user files alone =="
 "$HUB/bin/briefing" link "$P" >/dev/null   # ensure fully linked

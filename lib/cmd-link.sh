@@ -62,8 +62,8 @@ cmd_link() {
   # version, so `status` can explain divergence precisely.
   run mkdir -p "$PROJECT/.cursor/rules"
   { printf -- '---\ndescription: briefing directions (generated, edit %s)\nbriefing-hub: %s\nbriefing-version: %s\nbriefing-sha256: %s\nalwaysApply: true\n---\n' \
-      "$DIRECTIONS" "$HUB" "$(hub_version)" "$(hash_stdin < "$DIRECTIONS")"
-    cat "$DIRECTIONS"
+      "$DIRECTIONS" "$HUB" "$(hub_version)" "$(emit_text "$DIRECTIONS" | hash_stdin)"
+    emit_text "$DIRECTIONS"
   } | write_file "$PROJECT/.cursor/rules/briefing.mdc"
 
   # 4. Register (machine-local) so `briefing install` re-links this project

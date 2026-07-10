@@ -85,8 +85,8 @@ fi
 # The sha256 stamp records the directions content as generated, so `status`
 # can tell a hand-edited section from a merely outdated one.
 printf '\n%s\n<!-- briefing-sha256: %s -->\n\n' \
-  "$MARK" "$(hash_stdin < "$HUB/directions/AGENTS.md")" >> "$tmp"
-cat "$HUB/directions/AGENTS.md" >> "$tmp"
+  "$MARK" "$(emit_text "$HUB/directions/AGENTS.md" | hash_stdin)" >> "$tmp"
+emit_text "$HUB/directions/AGENTS.md" >> "$tmp"
 if [[ "${DRY_RUN:-0}" == "1" ]]; then
   printf 'would regenerate: %s (directions section)\n' "$SOUL"
   rm "$tmp"

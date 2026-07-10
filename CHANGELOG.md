@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Generated copies and their sha256 stamps are newline-normalized, so a
+  `directions/AGENTS.md` saved without a final newline is no longer
+  misreported by `briefing status` as hand-edited (`emit_text` helper in
+  `lib/common.sh`)
+
 ## [0.2.0] - 2026-07-10
 
 ### Added
