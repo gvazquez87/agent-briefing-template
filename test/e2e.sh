@@ -30,9 +30,16 @@ HUB="$T/.local/agent-briefing"
 if ! git -C "$TEMPLATE" diff --quiet HEAD; then
   git -C "$TEMPLATE" diff HEAD | git -C "$HUB" apply
   git -C "$HUB" -c user.email=e2e@test -c user.name=e2e commit -qam "e2e: uncommitted working tree changes"
-  # keep the fixture in the "everything pushed" state status expects
-  git -C "$HUB" update-ref "$(git -C "$HUB" rev-parse --symbolic-full-name @{upstream})" HEAD
 fi
+# status compares HEAD to @{upstream}. Local-path clones (and shallow CI
+# checkouts) often lack tracking; point origin at HEAD so the repo check is green.
+branch="$(git -C "$HUB" branch --show-current)"
+if [[ -z "$branch" ]]; then
+  git -C "$HUB" checkout -qb e2e-main
+  branch=e2e-main
+fi
+git -C "$HUB" update-ref "refs/remotes/origin/$branch" "$(git -C "$HUB" rev-parse HEAD)"
+git -C "$HUB" branch -u "origin/$branch"
 DIRECTIONS="$HUB/directions/AGENTS.md"
 
 echo "== 2. help and dry run before anything exists =="
