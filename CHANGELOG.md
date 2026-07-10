@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `briefing link` now manages a block in the project's `.git/info/exclude`
+  covering every generated artifact (skill links, `HERMES.md`/`CLAUDE.md`
+  mirrors, `briefing.mdc`), so nothing needs to be added to the committed
+  `.gitignore`; `briefing unlink` removes the block, `briefing status`
+  checks it
+
+### Changed
+
+- Project-level delivery (`briefing link`) is now gated on agent presence,
+  matching the global adapters: no `.claude/` links or `CLAUDE.md` mirror
+  without Claude, no `HERMES.md` without Hermes, no `briefing.mdc` without
+  Cursor. Agents installed later get their links on the next
+  `briefing install`, which re-links every registered project. `briefing
+  status` skips absent agents in project checks accordingly
+
 ## [0.2.1] - 2026-07-10
 
 ### Fixed

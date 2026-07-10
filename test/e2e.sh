@@ -12,12 +12,13 @@ export HOME="$T"
 export BRIEFING_COLOR=never
 unset XDG_STATE_HOME XDG_CONFIG_HOME || true
 
-# Fake agents on PATH so all adapters activate
+# Fake agents on PATH so all adapters (and project-level delivery, which is
+# gated on agent presence) activate
 mkdir -p "$T/fakebin"
-printf '#!/bin/sh\nexit 0\n' > "$T/fakebin/vibe"
-printf '#!/bin/sh\nexit 0\n' > "$T/fakebin/hermes"
-printf '#!/bin/sh\nexit 0\n' > "$T/fakebin/claude"
-chmod +x "$T/fakebin/vibe" "$T/fakebin/hermes" "$T/fakebin/claude"
+for a in vibe hermes claude cursor; do
+  printf '#!/bin/sh\nexit 0\n' > "$T/fakebin/$a"
+  chmod +x "$T/fakebin/$a"
+done
 export PATH="$T/fakebin:$PATH"
 
 fail() { echo "FAIL: $1"; exit 1; }
@@ -380,6 +381,48 @@ sed 's|^briefing-hub: .*|briefing-hub: /some/other/hub|' "$MDC" > "$MDC.tmp" && 
 [ -f "$P/.cursor/rules/briefing.mdc" ] || fail "foreign briefing.mdc removed"
 rm "$P/.cursor/rules/briefing.mdc"
 pass "unlink leaves a foreign hub's briefing.mdc alone"
+
+echo "== 21b. project delivery gated on installed agents; ignore block =="
+P4="$T/gatedproject"
+mkdir -p "$P4"
+git -C "$P4" init -q
+echo "# rules" > "$P4/AGENTS.md"
+printf '%s\n' "$FIRST_SKILL" > "$P4/.briefing-skills"
+rm "$T/fakebin/claude"
+hash -r 2>/dev/null || true
+"$HUB/bin/briefing" link "$P4" > "$T/link-gated.out"
+if command -v claude >/dev/null; then
+  echo "  (claude present on this host; skipping absence assertions)"
+else
+  [ ! -e "$P4/.claude" ] || fail "claude skill links created without claude installed"
+  [ ! -e "$P4/CLAUDE.md" ] || fail "CLAUDE.md mirror created without claude installed"
+  grep -q 'claude not installed' "$T/link-gated.out" || fail "link did not report the skipped agent"
+  "$HUB/bin/briefing" status >/dev/null || fail "status not green with claude absent"
+fi
+# vibe/cursor are still (fake-)installed, their delivery must be unaffected
+[ -L "$P4/.vibe/skills/$FIRST_SKILL" ] || fail "vibe delivery broken by gating"
+[ -f "$P4/.cursor/rules/briefing.mdc" ] || fail "cursor delivery broken by gating"
+# generated files are ignored machine-locally, nothing shows up as untracked
+grep -q '>>> briefing' "$P4/.git/info/exclude" || fail "exclude block not written"
+for f in HERMES.md .vibe/skills/x .cursor/rules/briefing.mdc CLAUDE.md; do
+  git -C "$P4" check-ignore -q "$f" || fail "$f not ignored via .git/info/exclude"
+done
+git -C "$P4" status --porcelain | grep -Eq 'HERMES|CLAUDE|\.vibe|\.cursor' \
+  && fail "generated files leak into git status"
+# installing the agent later: the next install re-links and grows the links
+printf '#!/bin/sh\nexit 0\n' > "$T/fakebin/claude"
+chmod +x "$T/fakebin/claude"
+hash -r 2>/dev/null || true
+"$HUB/bin/briefing" install >/dev/null
+[ "$(readlink "$P4/CLAUDE.md")" = "$P4/AGENTS.md" ] || fail "CLAUDE.md mirror not added after claude appeared"
+[ "$(readlink "$P4/.claude/skills/$FIRST_SKILL")" = "$HUB/skills/$FIRST_SKILL" ] || fail "claude skill links not added after claude appeared"
+git -C "$P4" status --porcelain | grep -q 'CLAUDE' && fail "late claude artifacts leak into git status"
+pass "delivery skips absent agents; a later install grows their links; all ignored"
+# unlink removes the ignore block again
+"$HUB/bin/briefing" unlink "$P4" >/dev/null
+grep -q '>>> briefing' "$P4/.git/info/exclude" 2>/dev/null && fail "exclude block not removed on unlink"
+pass "unlink removes the .git/info/exclude block"
+rm -rf "$P4"
 
 echo "== 22. uninstall reverses install; reinstall brings it back =="
 "$HUB/bin/briefing" link "$P" >/dev/null

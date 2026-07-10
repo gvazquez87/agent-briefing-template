@@ -14,7 +14,8 @@ The inverse of `briefing link` (idempotent):
   2. removes the generated .cursor/rules/briefing.mdc (only when its
      briefing-hub stamp names this hub)
   3. removes the HERMES.md and CLAUDE.md -> AGENTS.md mirrors
-  4. deregisters the project, so installs stop re-linking it
+  4. removes the briefing block from .git/info/exclude
+  5. deregisters the project, so installs stop re-linking it
 
 The project's own committed files (AGENTS.md, .briefing-skills) are never
 touched. Empty directories left behind are pruned.
@@ -69,9 +70,12 @@ cmd_unlink() {
         run rm "$PROJECT/$l"
       fi
     done
+
+    # 4. Drop the machine-local ignore block link wrote to .git/info/exclude
+    write_exclude_block "$PROJECT" ""
   fi
 
-  # 4. Deregister
+  # 5. Deregister
   if grep -qxF "$PROJECT" "$REG" 2>/dev/null; then
     if [[ "$DRY_RUN" == "1" ]]; then
       printf 'would deregister: %s from %s\n' "$PROJECT" "$REG"
