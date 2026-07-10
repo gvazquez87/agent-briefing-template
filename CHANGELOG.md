@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-07-10
+
 ### Fixed
 
 - Generated copies and their sha256 stamps are newline-normalized, so a
@@ -65,6 +67,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Self-contained end-to-end test (`test/e2e.sh`) in a throwaway HOME
 - `VERSION` file and `briefing --version`
 
-[Unreleased]: https://github.com/gvazquez87/agent-briefing-template/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/gvazquez87/agent-briefing-template/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/gvazquez87/agent-briefing-template/releases/tag/v0.2.1
 [0.2.0]: https://github.com/gvazquez87/agent-briefing-template/releases/tag/v0.2.0
 [0.1.0]: https://github.com/gvazquez87/agent-briefing-template/releases/tag/v0.1.0
