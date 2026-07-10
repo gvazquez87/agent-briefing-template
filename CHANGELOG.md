@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-07-10
+
 ### Added
 
 - `briefing link` now manages a block in the project's `.git/info/exclude`
@@ -84,7 +86,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Self-contained end-to-end test (`test/e2e.sh`) in a throwaway HOME
 - `VERSION` file and `briefing --version`
 
-[Unreleased]: https://github.com/gvazquez87/agent-briefing-template/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/gvazquez87/agent-briefing-template/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/gvazquez87/agent-briefing-template/releases/tag/v0.3.0
 [0.2.1]: https://github.com/gvazquez87/agent-briefing-template/releases/tag/v0.2.1
 [0.2.0]: https://github.com/gvazquez87/agent-briefing-template/releases/tag/v0.2.0
 [0.1.0]: https://github.com/gvazquez87/agent-briefing-template/releases/tag/v0.1.0
